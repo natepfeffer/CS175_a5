@@ -45,6 +45,13 @@ const float EPSILON = 1e-3;
 const float PI = 3.141592653589793;
 const float HALF = 0.5;
 const float HALF2 = HALF * HALF;
+const float INF = 1e20;
+
+const int SHAPE_CUBE = 0;
+const int SHAPE_CYLINDER = 1;
+const int SHAPE_CONE = 2;
+const int SHAPE_SPHERE = 3;
+
 
 // TODO: This should be your output color, instead of gl_FragColor
 out vec4 outColor;
@@ -143,8 +150,9 @@ Material fetchMaterial(int idx) {
 // ----------------------------------------------
 // intersectSphere: ray-sphere intersection in object space
 // Sphere is centered at origin with radius = 0.5
+// ro and rd should be in object space
 float intersectSphere(vec3 ro, vec3 rd) {
-    // TODO: implement ray-sphere intersection
+    // DONE: implement ray-sphere intersection
     // return -1.0;
 
     vec3 e = ro;
@@ -177,7 +185,7 @@ float intersectSphere(vec3 ro, vec3 rd) {
 // ----------------------------------------------
 // normalSphere: compute normal at intersection point in object space
 vec3 normalSphere(vec3 hitPos) {
-    // TODO: implement normal computation for sphere
+    // DONE: implement normal computation for sphere
     return normalize(hitPos);
 }
 
@@ -186,48 +194,204 @@ vec3 normalSphere(vec3 hitPos) {
 // Cube is centered at origin with side length = 1
 float intersectCube(vec3 ro, vec3 rd) {
     // TODO: implement ray-cube intersection
-    return -1.0;
+    // return -1.0;
+
+    float txp = (HALF - ro.x) / rd.x;
+    txp = (abs(ro.y + txp * rd.y) <= HALF && abs(ro.z + txp * rd.z) <= HALF) ? txp : -1.0;
+
+    float txn = (-HALF - ro.x) / rd.x;
+    txn = (abs(ro.y + txn * rd.y) <= HALF && abs(ro.z + txn * rd.z) <= HALF) ? txn : -1.0;
+
+    float typ = (HALF - ro.y) / rd.y;
+    typ = (abs(ro.x + typ * rd.x) <= HALF && abs(ro.z + typ * rd.z) <= HALF) ? typ : -1.0;
+
+    float tyn = (-HALF - ro.y) / rd.y;
+    tyn = (abs(ro.x + tyn * rd.x) <= HALF && abs(ro.z + tyn * rd.z) <= HALF) ? tyn : -1.0;
+
+    float tzp = (HALF - ro.z) / rd.z;
+    tzp = (abs(ro.x + tzp * rd.x) <= HALF && abs(ro.y + tzp * rd.y) <= HALF) ? tzp : -1.0;
+
+    float tzn = (-HALF - ro.z) / rd.z;
+    tzn = (abs(ro.x + tzn * rd.x) <= HALF && abs(ro.y + tzn * rd.y) <= HALF) ? tzn : -1.0;
+
+    float t = INF;
+    if (txp > 0.0) t = min(t, txp);
+    if (txn > 0.0) t = min(t, txn);
+    if (typ > 0.0) t = min(t, typ);
+    if (tyn > 0.0) t = min(t, tyn);
+    if (tzp > 0.0) t = min(t, tzp);
+    if (tzn > 0.0) t = min(t, tzn);
+
+    return (t == INF) ? -1.0 : t;
 }
 
 // ----------------------------------------------
 // normalCube: compute normal at intersection point in object space
 vec3 normalCube(vec3 hitPos) {
     // TODO: implement normal computation for cube
-    return vec3(1.0);
+    vec3 n = vec3(0.0);
+
+    if (abs(hitPos.x - HALF) < EPSILON)  n.x =  1.0;
+    if (abs(hitPos.x + HALF) < EPSILON)  n.x = -1.0;
+    if (abs(hitPos.y - HALF) < EPSILON)  n.y =  1.0;
+    if (abs(hitPos.y + HALF) < EPSILON)  n.y = -1.0;
+    if (abs(hitPos.z - HALF) < EPSILON)  n.z =  1.0;
+    if (abs(hitPos.z + HALF) < EPSILON)  n.z = -1.0;
+
+    return normalize(n);
 }
 
 // ----------------------------------------------
 // intersectCylinder: ray-cylinder intersection in object space
 float intersectCylinder(vec3 ro, vec3 rd) {
-    float t = -1.0;
-
-    // TODO: implement ray-cylinder intersection
     // Cylinder is centered at origin, radius = 0.5, height = 1
+    float ex = ro.x;
+    float ey = ro.y;
+    float ez = ro.z;
+    float dx = rd.x;
+    float dy = rd.y;
+    float dz = rd.z;
 
-    return t; // return closest intersection distance, or -1.0 if no hit
+    float tcaptop = INF;
+    float tcapbottom = INF;
+    float tbody = INF;
+
+    // Body Check
+    float A = dx * dx + dz * dz;
+    float B = 2.0 * (ex * dx + ez * dz);
+    float C = ex * ex + ez * ez - HALF2;
+
+    float discriminant = B * B - 4.0 * A * C;
+    if (discriminant < 0.0) {
+        tbody = INF;
+    } else {
+        float sqrtD = sqrt(discriminant);
+        float t1 = (-B + sqrtD) / (2.0 * A);
+        float t2 = (-B - sqrtD) / (2.0 * A);
+
+        if (t1 < 0.0 && t2 < 0.0) {
+            tbody = INF;
+        } else if (t1 < 0.0) {
+            tbody = t2;
+        } else if (t2 < 0.0) {
+            tbody = t1;
+        } else {
+            tbody = min(t1, t2);
+        }
+
+        // Check y bounds
+        float yAtT = ey + dy * tbody;
+        if (yAtT > HALF || yAtT < -HALF) {
+            tbody = INF;
+        }
+    }
+
+    // Top cap check
+    if (abs(dy) > EPSILON) {
+        tcaptop = (HALF - ey) / dy;
+        vec3 capPos = ro + rd * tcaptop;
+        if (tcaptop > 0.0 && capPos.x * capPos.x + capPos.z * capPos.z <= HALF2) {
+            // valid
+        } else {
+            tcaptop = INF;
+        }
+    }
+
+    // Bottom cap check
+    if (abs(dy) > EPSILON) {
+        tcapbottom = (-HALF - ey) / dy;
+        vec3 capPos = ro + rd * tcapbottom;
+        if (tcapbottom > 0.0 && capPos.x * capPos.x + capPos.z * capPos.z <= HALF2) {
+            // valid
+        } else {
+            tcapbottom = INF;
+        }
+    }
+
+    float t = min(min(tcaptop, tcapbottom), tbody);
+    return (t == INF) ? -1.0 : t;
 }
 
-// ----------------------------------------------
 // normalCylinder: compute normal at intersection point in object space
 vec3 normalCylinder(vec3 hitPos) {
-    // TODO: implement normal computation for cylinder
     // Cylinder is centered at origin, radius = 0.5, height = 1
-    return vec3(1.0);
+    if (abs(hitPos.y - HALF) < EPSILON) {
+        return vec3(0.0, 1.0, 0.0);
+    } else if (abs(hitPos.y + HALF) < EPSILON) {
+        return vec3(0.0, -1.0, 0.0);
+    } else {
+        return normalize(vec3(hitPos.x / HALF, 0.0, hitPos.z / HALF));
+    }
 }
+
 
 // ----------------------------------------------
 // intersectCone: ray-cone intersection in object space
 float intersectCone(vec3 ro, vec3 rd) {
-    // TODO: implement ray-cone intersection
-    return -1.0;
+    float ex = ro.x;
+    float ey = ro.y;
+    float ez = ro.z;
+    float dx = rd.x;
+    float dy = rd.y;
+    float dz = rd.z;
+
+    float tbody = INF;
+    float tcap = INF;
+
+    // Body Check
+    float A = dx * dx + dz * dz - HALF2 * dy * dy;
+    float B = 2.0 * (ex * dx + ez * dz) - HALF * ey * dy + HALF2 * dy;
+    float C = ex * ex + ez * ez - HALF2 * ey * ey + HALF2 * ey - (1.0 / 16.0);
+
+    float discriminant = B * B - 4.0 * A * C;
+    if (discriminant < 0.0) {
+        tbody = INF;
+    } else {
+        float sqrtD = sqrt(discriminant);
+        float t1 = (-B + sqrtD) / (2.0 * A);
+        float t2 = (-B - sqrtD) / (2.0 * A);
+
+        if (t1 < 0.0 && t2 < 0.0) {
+            tbody = INF;
+        } else if (t1 < 0.0) {
+            tbody = t2;
+        } else if (t2 < 0.0) {
+            tbody = t1;
+        } else {
+            tbody = min(t1, t2);
+        }
+
+        // Check y bounds
+        float yAtT = ey + dy * tbody;
+        if (yAtT > HALF || yAtT < -HALF) {
+            tbody = INF;
+        }
+    }
+
+    // Bottom cap check
+    if (abs(dy) > EPSILON) {
+        tcap = (-HALF - ey) / dy;
+        vec3 capPos = ro + rd * tcap;
+        if (tcap > 0.0 && capPos.x * capPos.x + capPos.z * capPos.z <= HALF2) {
+            // valid
+        } else {
+            tcap = INF;
+        }
+    }
+
+    float t = min(tbody, tcap);
+    return (t == INF) ? -1.0 : t;
 }
 
-// ----------------------------------------------
 // normalCone: compute normal at intersection point in object space
 vec3 normalCone(vec3 hitPos) {
-    // TODO: implement normal computation for cone
-    return vec3(1.0);
+    if (abs(hitPos.y + HALF) < EPSILON) {
+        return vec3(0.0, -1.0, 0.0);
+    } else {
+        return normalize(vec3(hitPos.x / HALF, HALF, hitPos.z / HALF));
+    }
 }
+
 
 vec2 getTexCoordSphere(vec3 hit, vec2 repeatUV) {
     // TODO: implement spherical mapping
@@ -268,39 +432,72 @@ bool isInShadow(vec3 p, vec3 lightDir, float maxDist) {
     return false; 
 }
 
+
+//----------------------------------------------
+// CUSTOM HELPER Functions
+//----------------------------------------------
+
+// funnel for intersecting different object types
 float intersect(vec3 ro, vec3 rd, int idx) {
     int type = int(fetchFloat(0, idx));
-//    switch (type) {
-  //      case SHAPE_CUBE: {
-    //        float t = intersectCube(rlo, rld);
-      //      if (t != -1.0) return t;   // GLSL has no null, so use -1 or another sentinel
-        //    break;
-//        }
 
-  //      case SHAPE_SPHERE: {
-    //        float t = intersectSphere(rlo, rld);
-      //      if (t != -1.0) return t;
-        //    break;
-//        }
+    switch (type) {
+        case SHAPE_CUBE: {
+            float t = intersectCube(ro, rd);
+            if (t != -1.0) return t;
+            break;
+        }
 
-  //      case SHAPE_CYLINDER: {
-    //        float t = intersectCylinder(rlo, rld);
-      //      if (t != -1.0) return t;
-        //    break;
-//        }
+        case SHAPE_SPHERE: {
+            float t = intersectSphere(ro, rd);
+            if (t != -1.0) return t;
+            break;
+        }
 
-  //      case SHAPE_CONE: {
-    //        float t = intersectCone(rlo, rld);
-      //      if (t != -1.0) return t;
-    //        break;
-  //      }
-//
-//        default:
-//            break;
-//    }
+        case SHAPE_CYLINDER: {
+            float t = intersectCylinder(ro, rd);
+            if (t != -1.0) return t;
+            break;
+        }
 
-    return 1.0;  // Infinity in GLSL (or use a large number)
+        case SHAPE_CONE: {
+            float t = intersectCone(ro, rd);
+            if (t != -1.0) return t;
+            break;
+        }
 
+        default:
+            break;
+    }
+
+    return INF;
+}
+
+vec3 getNormal(vec3 hitPos, int idx) {
+    int type = int(fetchFloat(0, idx));
+
+    switch (type) {
+        case SHAPE_CUBE: {
+            return normalCube(hitPos);
+        }
+
+        case SHAPE_SPHERE: {
+            return normalSphere(hitPos);
+        }
+
+        case SHAPE_CYLINDER: {
+            return normalCylinder(hitPos);
+        }
+
+        case SHAPE_CONE: {
+            return normalCone(hitPos);
+        }
+
+        default:
+            break;
+    }
+
+    return vec3(0.0); 
 }
 
 // bounce = recursion level (0 for primary rays)
@@ -309,25 +506,34 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
     // TODO: implement ray tracing logic
     // Get the object space rayOrigin and rayDir
     float t = -1.0;
+    vec3 normal = vec3(0.0);
+
+    // NEED TO SAVE INDEX AND META DATA TO USE POST LOOP
+
     for(int i = 0; i < uObjectCount; i++) {
         // get world to object matrix
         mat4 M = fetchWorldMatrix(i);
-        mat4 worldToCamM = inverse(M);
+        mat4 worldToCamM = M; //inverse(M);
 
         // transform ray
         vec3 ro = (worldToCamM * vec4(rayOrigin, 1.0)).xyz;
         vec3 rd = (worldToCamM * vec4(rayDir, 1.0)).xyz;
 
-        // use intersect to get t using if statements to use the appropriate function
-        t = intersectSphere(ro, rd);
+        // use intersect to get t
+        t = intersect(ro, rd, i);
+
+        // just for testing, get normal
+        
     }
 
-    // Determine which object has the lowest positive t value.
+    // Determine which object has the lowest positive t value
 
     // use t to get hitPos
     vec3 hitPos = t * rayDir + rayOrigin;
     // use hitPos to get normal
-    vec3 normal = normalSphere(hitPos);
+    // vec3 normal = getNormal(hitPos, i);
+    normal = getNormal(hitPos, 0);
+
     // use normal to get color
     // return color
     return normal;
