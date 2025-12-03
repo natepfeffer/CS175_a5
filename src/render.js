@@ -306,6 +306,8 @@ export class WebGLRenderer {
     }
 
     renderFrame() {
+        console.log("rendering frame");
+
         const gl = this.gl;
         this.resizeCanvasToDisplaySize();
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -336,6 +338,7 @@ export class WebGLRenderer {
 
         // Global coefficients
         const globalData = this.sceneParser.getGlobalData();
+        console.log("globalssssssss:", globalData);
         this.programs.rayTrace.setFloat('uGlobalKa', globalData.ka);
         this.programs.rayTrace.setFloat('uGlobalKd', globalData.kd);
         this.programs.rayTrace.setFloat('uGlobalKs', globalData.ks);

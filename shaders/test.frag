@@ -255,8 +255,11 @@ vec2 getTexCoordCone(vec3 hit, vec2 repeatUV) {
 vec3 getWorldRayDir() {
     vec2 uv  = gl_FragCoord.xy / uResolution; 
     // TODO: compute ray direction in world space
-    vec3 dir = vec3(0.0);
-    return dir;
+    uv = 2. * uv - 1.;
+    vec3 uvworld = (uCamWorldMatrix * vec4(uv, -1.0, 1.0)).xyz;
+    
+    vec3 dir = uvworld - uCameraPos; 
+    return normalize(dir);
 }
 
 // to help test occlusion (shadow)
@@ -265,11 +268,69 @@ bool isInShadow(vec3 p, vec3 lightDir, float maxDist) {
     return false; 
 }
 
+float intersect(vec3 ro, vec3 rd, int idx) {
+    int type = int(fetchFloat(0, idx));
+//    switch (type) {
+  //      case SHAPE_CUBE: {
+    //        float t = intersectCube(rlo, rld);
+      //      if (t != -1.0) return t;   // GLSL has no null, so use -1 or another sentinel
+        //    break;
+//        }
+
+  //      case SHAPE_SPHERE: {
+    //        float t = intersectSphere(rlo, rld);
+      //      if (t != -1.0) return t;
+        //    break;
+//        }
+
+  //      case SHAPE_CYLINDER: {
+    //        float t = intersectCylinder(rlo, rld);
+      //      if (t != -1.0) return t;
+        //    break;
+//        }
+
+  //      case SHAPE_CONE: {
+    //        float t = intersectCone(rlo, rld);
+      //      if (t != -1.0) return t;
+    //        break;
+  //      }
+//
+//        default:
+//            break;
+//    }
+
+    return 1.0;  // Infinity in GLSL (or use a large number)
+
+}
 
 // bounce = recursion level (0 for primary rays)
+// end goal: trace a ray that bounces 5 times to determine color of pixel
 vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
     // TODO: implement ray tracing logic
-    return vec3(0.0);
+    // Get the object space rayOrigin and rayDir
+    float t = -1.0;
+    for(int i = 0; i < uObjectCount; i++) {
+        // get world to object matrix
+        mat4 M = fetchWorldMatrix(i);
+        mat4 worldToCamM = inverse(M);
+
+        // transform ray
+        vec3 ro = (worldToCamM * vec4(rayOrigin, 1.0)).xyz;
+        vec3 rd = (worldToCamM * vec4(rayDir, 1.0)).xyz;
+
+        // use intersect to get t using if statements to use the appropriate function
+        t = intersectSphere(ro, rd);
+    }
+
+    // Determine which object has the lowest positive t value.
+
+    // use t to get hitPos
+    vec3 hitPos = t * rayDir + rayOrigin;
+    // use hitPos to get normal
+    vec3 normal = normalSphere(hitPos);
+    // use normal to get color
+    // return color
+    return normal;
 }
 
 
