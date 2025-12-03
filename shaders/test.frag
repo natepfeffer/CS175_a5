@@ -43,6 +43,8 @@ uniform int uMaxDepth; // maximum recursion depth for reflections
 // constants
 const float EPSILON = 1e-3;
 const float PI = 3.141592653589793;
+const float HALF = 0.5;
+const float HALF2 = HALF * HALF;
 
 // TODO: This should be your output color, instead of gl_FragColor
 out vec4 outColor;
@@ -143,14 +145,40 @@ Material fetchMaterial(int idx) {
 // Sphere is centered at origin with radius = 0.5
 float intersectSphere(vec3 ro, vec3 rd) {
     // TODO: implement ray-sphere intersection
-    return -1.0;
+    // return -1.0;
+
+    vec3 e = ro;
+    vec3 d = rd;
+    float A = dot(d, d);
+    float B = 2.0 * dot(d, e);
+    float C = dot(e, e) - HALF2;
+
+    float discriminant = B * B - 4.0 * A * C;
+
+    if (discriminant < 0.0) {
+        return -1.0;
+    } else {
+        float sqrtD = sqrt(discriminant);
+        float t1 = (-B + sqrtD) / (2.0 * A);
+        float t2 = (-B - sqrtD) / (2.0 * A);
+
+        if (t1 < 0.0 && t2 < 0.0) {
+            return -1.0;
+        } else if (t1 < 0.0) {
+            return t2;
+        } else if (t2 < 0.0) {
+            return t1;
+        } else {
+            return min(t1, t2);
+        }
+    }
 }
 
 // ----------------------------------------------
 // normalSphere: compute normal at intersection point in object space
 vec3 normalSphere(vec3 hitPos) {
     // TODO: implement normal computation for sphere
-    return vec3(1.0);
+    return normalize(hitPos);
 }
 
 // ----------------------------------------------
