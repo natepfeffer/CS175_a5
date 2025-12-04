@@ -458,67 +458,66 @@ vec3 getNormal(vec3 hitPos, int idx) {
 // Assume unit shapes centered at origin for texture mapping
 vec2 getTexCoordSphere(vec3 hit, vec2 repeatUV) {
     float theta = atan(hit.x, hit.z);
-    float u;
+    float u = (theta / (2.0 * PI)) + 0.5;
 
-    if (theta < 0.0) {
-        u = -(theta / (2.0 * PI));
-    } else {
-        u = 1.0 - (theta / (2.0 * PI));
-    }
-
-    float phi = asin(hit.y);
-    float v = (phi / PI) + 0.5;
-
-    return vec2(u, v);
+    float phi = asin(hit.y / HALF);
+    float v = (phi / PI) + HALF;
+    
+    return vec2(u * repeatUV.x, (1.0 - v) * repeatUV.y);
 }
 
 vec2 getTexCoordCube(vec3 hit, vec3 dominantFace, vec2 repeatUV) {
+    // Map coordinates from [-0.5, 0.5] to [0, 1] for texture coordinates
     if (dominantFace.x == 1.0) {
-        return vec2((hit.z + HALF) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
+        float v = (hit.y + HALF);
+        return vec2((hit.z + HALF) * repeatUV.x, (1.0 - v) * repeatUV.y);
     } else if (dominantFace.x == -1.0) {
-        return vec2((HALF - hit.z) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
+        float v = (hit.y + HALF);
+        return vec2((HALF - hit.z) * repeatUV.x, (1.0 - v) * repeatUV.y);
     } else if (dominantFace.y == 1.0) {
-        return vec2((hit.x + HALF) * repeatUV.x, (HALF - hit.z) * repeatUV.y);
+        float v = (HALF - hit.z);
+        return vec2((hit.x + HALF) * repeatUV.x, (1.0 - v) * repeatUV.y);
     } else if (dominantFace.y == -1.0) {
-        return vec2((hit.x + HALF) * repeatUV.x, (hit.z + HALF) * repeatUV.y);
+        float v = (hit.z + HALF);
+        return vec2((hit.x + HALF) * repeatUV.x, (1.0 - v) * repeatUV.y);
     } else if (dominantFace.z == 1.0) {
-        return vec2((hit.x + HALF) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
+        float v = (hit.y + HALF);
+        return vec2((hit.x + HALF) * repeatUV.x, (1.0 - v) * repeatUV.y);
     } else if (dominantFace.z == -1.0) {
-        return vec2((HALF - hit.x) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
+        float v = (hit.y + HALF);
+        return vec2((HALF - hit.x) * repeatUV.x, (1.0 - v) * repeatUV.y);
     }
     return vec2(0.0);
 }
 
-vec2 getTexCoordCylinder(vec3 hit, vec2 repeatUV) {
-    float theta = atan(hit.x, hit.z);
-    float u;
-
-    if (theta < 0.0) {
-        u = -(theta / (2.0 * PI));
+vec2 getTexCoordCylinder(vec3 hit, vec3 normal, vec2 repeatUV) {    
+    // Check if we're on a cap 
+    if (abs(normal.y - 1.0) < EPSILON) {
+        return vec2((hit.x + HALF) * repeatUV.x, (hit.z + HALF) * repeatUV.y);
+    } else if (abs(normal.y + 1.0) < EPSILON) {
+        return vec2((hit.x + HALF) * repeatUV.x, (HALF - hit.z) * repeatUV.y);
     } else {
-        u = 1.0 - (theta / (2.0 * PI));
+        float theta = atan(hit.x, hit.z);
+        float u = (theta / (2.0 * PI)) + 0.5;
+
+        float v = hit.y + HALF;
+
+        return vec2(u * repeatUV.x, (1.0 - v) * repeatUV.y);
     }
-
-    float phi = asin(hit.y);
-    float v = (phi / PI) + 0.5;
-
-    return vec2(u, v);
 }
 
-vec2 getTexCoordCone(vec3 hit, vec2 repeatUV) {
-    float theta = atan(hit.x, hit.z);
-    float u;
-
-    if (theta < 0.0) {
-        u = -(theta / (2.0 * PI));
+vec2 getTexCoordCone(vec3 hit, vec3 normal, vec2 repeatUV) {
+    // Check if we're on the cap
+    if (abs(normal.y + 1.0) < EPSILON) {
+        return vec2((hit.x + HALF) * repeatUV.x, (HALF - hit.z) * repeatUV.y);
     } else {
-        u = 1.0 - (theta / (2.0 * PI));
+        float theta = atan(hit.x, hit.z);
+        float u = (theta / (2.0 * PI)) + 0.5;
+
+        float v = hit.y + HALF;
+
+        return vec2(u * repeatUV.x, (1.0 - v) * repeatUV.y);
     }
-
-    float phi = asin(hit.y);
-    float v = (phi / PI) + 0.5;
-
-    return vec2(u, v);
 }
 
 // getTex: fetch texture color from texture index and uv coordinates
@@ -561,11 +560,13 @@ vec3 getTexColor(vec3 hitPosObj, int idx) {
             break;
         }
         case SHAPE_CYLINDER: {
-            color = getTex(mat.textureIndex, getTexCoordCylinder(hitPosObj, mat.repeatUV));
+            vec3 normal = normalCylinder(hitPosObj);
+            color = getTex(mat.textureIndex, getTexCoordCylinder(hitPosObj, normal, mat.repeatUV));
             break;
         }
         case SHAPE_CONE: {
-            color = getTex(mat.textureIndex, getTexCoordCone(hitPosObj, mat.repeatUV));
+            vec3 normal = normalCone(hitPosObj);
+            color = getTex(mat.textureIndex, getTexCoordCone(hitPosObj, normal, mat.repeatUV));
             break;
         }
         default: {
