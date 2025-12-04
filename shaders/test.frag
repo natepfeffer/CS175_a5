@@ -474,17 +474,17 @@ vec2 getTexCoordSphere(vec3 hit, vec2 repeatUV) {
 
 vec2 getTexCoordCube(vec3 hit, vec3 dominantFace, vec2 repeatUV) {
     if (dominantFace.x == 1.0) {
-        return vec2((hit.z + HALF) * repeatUV.x, (hit.y + HALF) * repeatUV.y);
+        return vec2((hit.z + HALF) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
     } else if (dominantFace.x == -1.0) {
-        return vec2((HALF - hit.z) * repeatUV.x, (hit.y + HALF) * repeatUV.y);
+        return vec2((HALF - hit.z) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
     } else if (dominantFace.y == 1.0) {
         return vec2((hit.x + HALF) * repeatUV.x, (HALF - hit.z) * repeatUV.y);
     } else if (dominantFace.y == -1.0) {
         return vec2((hit.x + HALF) * repeatUV.x, (hit.z + HALF) * repeatUV.y);
     } else if (dominantFace.z == 1.0) {
-        return vec2((hit.x + HALF) * repeatUV.x, (hit.y + HALF) * repeatUV.y);
+        return vec2((hit.x + HALF) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
     } else if (dominantFace.z == -1.0) {
-        return vec2((HALF - hit.x) * repeatUV.x, (hit.y + HALF) * repeatUV.y);
+        return vec2((HALF - hit.x) * repeatUV.x, (hit.y - HALF) * repeatUV.y);
     }
     return vec2(0.0);
 }
