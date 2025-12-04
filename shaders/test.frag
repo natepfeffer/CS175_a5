@@ -706,7 +706,7 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
             vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
 
             // Calculate diffuse contribution
-            vec3 objColor = mat.useTexture * getTexColor(hitPosObj, objectID) + (1.0 - mat.useTexture) * mat.diffuseColor;
+            vec3 objColor = 2.5 * mat.useTexture * getTexColor(hitPosObj, objectID) + (1.0 - mat.useTexture) * mat.diffuseColor;
             vec3 diffuse = kd * objColor * max(0.0, nDotL);
             
             // Calculate specular contribution (safely)
@@ -793,7 +793,7 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
                 vec3 reflectLightDir = 2.0 * nDotL * nWorldReflect - lightDir;
                 
                 
-                vec3 objColorReflect = matReflect.useTexture * getTexColor(hitPosObjReflect, objectIDReflect) + (1.0 - matReflect.useTexture) * matReflect.diffuseColor;
+                vec3 objColorReflect = 2.5 * matReflect.useTexture * getTexColor(hitPosObjReflect, objectIDReflect) + (1.0 - matReflect.useTexture) * matReflect.diffuseColor;
                 vec3 diffuse = kd * objColorReflect * max(0.0, nDotL);
                 
                 float specFactor = max(0.0, dot(reflectLightDir, viewDirReflect));
