@@ -528,6 +528,8 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         return vec3(0.0);
     }
 
+    // if ((t != INF) && (t > .0)) return vec3(1.0);
+
     // Get the world matrix for this object
     mat4 worldMatrix = fetchWorldMatrix(objectID);
     mat4 objMatrix = inverse(worldMatrix);
@@ -567,7 +569,6 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         
         // Calculate light direction (from hit point to light)
         vec3 lightDir = normalize(lightPos - pWorld); //SWITCHED
-        
         // Calculate reflection vector: R = 2(L·N)N - L
         // float nDotL = dot(nWorld, lightDir);
         // vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
@@ -584,8 +585,8 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
 
 
         //attempt // might need to factor in shadows later
-        vec3 diffuse = kd * mat.diffuseColor * dot(nWorld, lightDir);
-        vec3 specular = ks * mat.specularColor * pow(dot(reflectDir, rayDir), mat.shininess);
+        vec3 diffuse = kd * mat.diffuseColor * max(0.0, dot(nWorld, lightDir));
+        vec3 specular = ks * mat.specularColor * pow(max(0.0, dot(reflectDir, rayDir)), mat.shininess);
         color += lightColor * (diffuse + specular);
     }
     
