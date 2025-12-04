@@ -519,7 +519,7 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         if (tempT != -1.0 && tempT < t) { // this requires t to be positive.
             t = tempT;
             objectID = i;
-            hitPosObj = rayOrigin + rayDir * t; 
+            hitPosObj = ro + rd * t; 
         }
     }
 
@@ -557,7 +557,7 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
     vec3 color = ambientColor; // color = (R, G, B)
     
     // Calculate view direction (from hit point to camera)
-    vec3 viewDir = normalize(uCameraPos - pWorld); // lowkey just use rayDir?
+    // vec3 viewDir = normalize(uCameraPos - pWorld);
     
     // Loop through all lights
     for (int i = 0; i < m; i++) {
@@ -566,13 +566,13 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         vec3 lightPos = uLightPos[i];
         
         // Calculate light direction (from hit point to light)
-        vec3 lightDir = normalize(lightPos - pWorld);
+        vec3 lightDir = normalize(lightPos - pWorld); //SWITCHED
         
         // Calculate reflection vector: R = 2(L·N)N - L
         // float nDotL = dot(nWorld, lightDir);
         // vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
         vec3 reflectDir = lightDir - 2.0 * dot(lightDir, nWorld) * nWorld;
-        
+
         // Calculate diffuse contribution
         // float diffuseFactor = max(0.0, nDotL); 
         // vec3 diffuseColor = kd * mat.diffuseColor * diffuseFactor;
@@ -583,13 +583,10 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         // vec3 specularColor = ks * mat.specularColor * specularPower;
 
 
-        //nate attempt // might need to factor in shadows later
-        vec3 diffuse = lightColor * (kd * mat.diffuseColor * dot(nWorld, lightDir));
-        vec3 specular = ks * mat.specularColor * pow(dot(reflectDir, viewDir), mat.shininess);
-        color += diffuse + specular;
-        
-        // Add light contribution
-        // color += lightColor * (diffuseColor + specularColor);
+        //attempt // might need to factor in shadows later
+        vec3 diffuse = kd * mat.diffuseColor * dot(nWorld, lightDir);
+        vec3 specular = ks * mat.specularColor * pow(dot(reflectDir, rayDir), mat.shininess);
+        color += lightColor * (diffuse + specular);
     }
     
     // Clamp color values to [0, 1] range
