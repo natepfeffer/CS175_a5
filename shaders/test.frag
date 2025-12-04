@@ -579,7 +579,7 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         
         // Calculate specular contribution (safely)
         float specFactor = max(0.0, dot(reflectDir, viewDir));
-        specFactor = pow(specFactor, max(1.0, mat.shininess)); // Ensure shininess >= 1
+        specFactor = pow(specFactor, max(EPSILON, mat.shininess)); // Ensure shininess >= 1
         vec3 specular = ks * mat.specularColor * specFactor;
         
         color += lightColor * (diffuse + specular);
