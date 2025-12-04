@@ -559,7 +559,7 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
     vec3 color = ambientColor; // color = (R, G, B)
     
     // Calculate view direction (from hit point to camera)
-    // vec3 viewDir = normalize(uCameraPos - pWorld);
+    vec3 viewDir = normalize(uCameraPos - pWorld);
     
     // Loop through all lights
     for (int i = 0; i < m; i++) {
@@ -568,25 +568,20 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         vec3 lightPos = uLightPos[i];
         
         // Calculate light direction (from hit point to light)
-        vec3 lightDir = normalize(lightPos - pWorld); //SWITCHED
+        vec3 lightDir = normalize(lightPos - pWorld);
+        
         // Calculate reflection vector: R = 2(L·N)N - L
-        // float nDotL = dot(nWorld, lightDir);
-        // vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
-        vec3 reflectDir = lightDir - 2.0 * dot(lightDir, nWorld) * nWorld;
+        float nDotL = dot(nWorld, lightDir);
+        vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
 
         // Calculate diffuse contribution
-        // float diffuseFactor = max(0.0, nDotL); 
-        // vec3 diffuseColor = kd * mat.diffuseColor * diffuseFactor;
+        vec3 diffuse = kd * mat.diffuseColor * max(0.0, nDotL);
         
-        // Calculate specular contribution
-        // float specularFactor = max(0.0, dot(reflectDir, viewDir));
-        // float specularPower = pow(specularFactor, mat.shininess);
-        // vec3 specularColor = ks * mat.specularColor * specularPower;
-
-
-        //attempt // might need to factor in shadows later
-        vec3 diffuse = kd * mat.diffuseColor * max(0.0, dot(nWorld, lightDir));
-        vec3 specular = ks * mat.specularColor * pow(max(0.0, dot(reflectDir, rayDir)), mat.shininess);
+        // Calculate specular contribution (safely)
+        float specFactor = max(0.0, dot(reflectDir, viewDir));
+        specFactor = pow(specFactor, max(1.0, mat.shininess)); // Ensure shininess >= 1
+        vec3 specular = ks * mat.specularColor * specFactor;
+        
         color += lightColor * (diffuse + specular);
     }
     
