@@ -519,7 +519,7 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         if (tempT != -1.0 && tempT < t) { // this requires t to be positive.
             t = tempT;
             objectID = i;
-            hitPosObj = ro + rd * t; 
+            hitPosObj = ro + rd * t; // hit position in object space
         }
     }
 
@@ -527,9 +527,6 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
     if (t == INF || objectID == -1) {
         return vec3(0.0);
     }
-
-    // If intersection and not final recursion level, begin recursion
-    
 
     // if ((t != INF) && (t > .0)) return vec3(1.0);
 
@@ -587,7 +584,92 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         
         color += lightColor * (diffuse + specular);
     }
+
+
+
+    // If intersection and not final recursion level, begin recursion
+    vec3 currentRayOrigin = pWorld;
+    vec3 currentRayDir = rayDir;
+    vec3 currentNormal = nWorld;
+    int currentObjectID = objectID;
     
+    for(int depth = 1; depth < uMaxDepth; depth++) {
+        // Calculate reflection direction
+        vec3 reflectDir = normalize(currentRayDir - 2.0 * dot(currentRayDir, currentNormal) * currentNormal);
+        vec3 reflectOrigin = currentRayOrigin + currentNormal * 2.0 * EPSILON;
+        
+        // Find closest intersection with reflection ray
+        float tReflect = INF;
+        int objectIDReflect = -1;
+        vec3 hitPosObjReflect = vec3(0.0);
+        
+        for(int i = 0; i < uObjectCount; i++) {
+            mat4 M = fetchWorldMatrix(i);
+            mat4 worldToObjM = inverse(M);
+            
+            vec3 ro = (worldToObjM * vec4(reflectOrigin, 1.0)).xyz;
+            vec3 rd = (worldToObjM * vec4(reflectDir, 0.0)).xyz;
+            
+            float tempT = intersect(ro, rd, i);
+            
+            if (tempT != -1.0 && tempT < tReflect) {
+                tReflect = tempT;
+                objectIDReflect = i;
+                hitPosObjReflect = ro + rd * tempT;
+            }
+        }
+        
+        // If no intersection, stop recursion
+        if (tReflect == INF || objectIDReflect == -1) {
+            break;
+        }
+        
+        // Process the reflected ray intersection
+        mat4 worldMatrixReflect = fetchWorldMatrix(objectIDReflect);
+        vec3 pWorldReflect = (worldMatrixReflect * vec4(hitPosObjReflect, 1.0)).xyz;
+        
+        // Get normal at reflection point
+        vec3 normalObjReflect = getNormal(hitPosObjReflect, objectIDReflect);
+        mat4 objMatrixReflect = inverse(worldMatrixReflect);
+        mat4 normMatrixReflect = transpose(objMatrixReflect);
+        vec3 nWorldReflect = normalize((normMatrixReflect * vec4(normalObjReflect, 0.0)).xyz);
+        
+        // Get material properties
+        Material matReflect = fetchMaterial(objectIDReflect);
+        
+        // Calculate lighting at reflection point
+        vec3 ambientReflect = ka * matReflect.ambientColor;
+        vec3 colorReflect = ambientReflect;
+        
+        vec3 viewDirReflect = normalize(uCameraPos - pWorldReflect);
+        
+        for (int i = 0; i < m; i++) {
+            vec3 lightColor = uLightColor[i];
+            vec3 lightPos = uLightPos[i];
+            
+            vec3 lightDir = normalize(lightPos - pWorldReflect);
+            float nDotL = dot(nWorldReflect, lightDir);
+            vec3 reflectLightDir = 2.0 * nDotL * nWorldReflect - lightDir;
+            
+            vec3 diffuse = kd * matReflect.diffuseColor * max(0.0, nDotL);
+            
+            float specFactor = max(0.0, dot(reflectLightDir, viewDirReflect));
+            specFactor = pow(specFactor, max(EPSILON, matReflect.shininess));
+            vec3 specular = ks * matReflect.specularColor * specFactor;
+            
+            colorReflect += lightColor * (diffuse + specular);
+        }
+        
+        // Add contribution with depth attenuation
+        float depthAttenuation = pow(0.5, float(depth));
+        color += colorReflect * matReflect.reflectiveColor * depthAttenuation;
+        
+        // Update for next recursion level
+        currentRayOrigin = pWorldReflect;
+        currentRayDir = reflectDir;
+        currentNormal = nWorldReflect;
+        currentObjectID = objectIDReflect;
+    }
     // Clamp color values to [0, 1] range
     return color;
 }
