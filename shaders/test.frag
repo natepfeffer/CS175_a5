@@ -500,17 +500,17 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
     // data to track closest object
     float t = INF;
     int objectID = -1;
-    vec3 hitPos = vec3(0.0);
-    vec3 color = vec3(0.0);
+    vec3 hitPosObj = vec3(0.0);
     
+    // loop over each object to find closest
     for(int i = 0; i < uObjectCount; i++) {
         // get world to object matrix
         mat4 M = fetchWorldMatrix(i);
-        mat4 worldToCamM = inverse(M);
+        mat4 worldToObjM = inverse(M);
 
         // transform ray
-        vec3 ro = (worldToCamM * vec4(rayOrigin, 1.0)).xyz;
-        vec3 rd = (worldToCamM * vec4(rayDir, 0.0)).xyz;
+        vec3 ro = (worldToObjM * vec4(rayOrigin, 1.0)).xyz;
+        vec3 rd = (worldToObjM * vec4(rayDir, 0.0)).xyz;
 
         // use intersect to get t
         float tempT = intersect(ro, rd, i); 
@@ -519,13 +519,80 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         if (tempT != -1.0 && tempT < t) { // this requires t to be positive.
             t = tempT;
             objectID = i;
-            hitPos = rayOrigin + rayDir * t; 
+            hitPosObj = rayOrigin + rayDir * t; 
         }
     }
-    // use hitPos to get normal
-    vec3 normal = getNormal(hitPos, objectID);
-    // TODO: use normal to get color
-    if (t != INF) color = vec3(1.0); // for isect only
+
+    // If no intersection, return black
+    if (t == INF || objectID == -1) {
+        return vec3(0.0);
+    }
+
+    // Get the world matrix for this object
+    mat4 worldMatrix = fetchWorldMatrix(objectID);
+    mat4 objMatrix = inverse(worldMatrix);
+
+    // Global material coefficients
+    float ka = uGlobalKa;
+    float kd = uGlobalKd;
+    float ks = uGlobalKs;
+    int   m  = uNumLights;
+
+    // Get normal in object space
+    vec3 normalObj = getNormal(hitPosObj, objectID);
+
+    // Transform normal to world space (using transpose of inverse)
+    mat4 normMatrix = transpose(objMatrix);
+    vec3 nWorld = normalize((normMatrix * vec4(normalObj, 0.0)).xyz);
+    
+    // Transform hit position to world space
+    vec3 pWorld = (worldMatrix * vec4(hitPosObj, 1.0)).xyz; // might need transpose
+    
+    // Get material properties
+    Material mat = fetchMaterial(objectID);
+    
+    
+    // Start with ambient color
+    vec3 ambientColor = ka * mat.ambientColor;
+    vec3 color = ambientColor; // color = (R, G, B)
+    
+    // Calculate view direction (from hit point to camera)
+    vec3 viewDir = normalize(uCameraPos - pWorld); // lowkey just use rayDir?
+    
+    // Loop through all lights
+    for (int i = 0; i < m; i++) {
+        // Get light color and position
+        vec3 lightColor = uLightColor[i];
+        vec3 lightPos = uLightPos[i];
+        
+        // Calculate light direction (from hit point to light)
+        vec3 lightDir = normalize(lightPos - pWorld);
+        
+        // Calculate reflection vector: R = 2(L·N)N - L
+        // float nDotL = dot(nWorld, lightDir);
+        // vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
+        vec3 reflectDir = lightDir - 2.0 * dot(lightDir, nWorld) * nWorld;
+        
+        // Calculate diffuse contribution
+        // float diffuseFactor = max(0.0, nDotL); 
+        // vec3 diffuseColor = kd * mat.diffuseColor * diffuseFactor;
+        
+        // Calculate specular contribution
+        // float specularFactor = max(0.0, dot(reflectDir, viewDir));
+        // float specularPower = pow(specularFactor, mat.shininess);
+        // vec3 specularColor = ks * mat.specularColor * specularPower;
+
+
+        //nate attempt // might need to factor in shadows later
+        vec3 diffuse = lightColor * (kd * mat.diffuseColor * dot(nWorld, lightDir));
+        vec3 specular = ks * mat.specularColor * pow(dot(reflectDir, viewDir), mat.shininess);
+        color += diffuse + specular;
+        
+        // Add light contribution
+        // color += lightColor * (diffuseColor + specularColor);
+    }
+    
+    // Clamp color values to [0, 1] range
     return color;
 }
 
