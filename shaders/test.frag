@@ -45,7 +45,7 @@ const float EPSILON = 1e-3;
 const float PI = 3.141592653589793;
 const float HALF = 0.5;
 const float HALF2 = HALF * HALF;
-const float INF = 1e20;
+float INF = 1.0 / 0.0;
 
 const int SHAPE_CUBE = 0;
 const int SHAPE_CYLINDER = 1;
@@ -324,7 +324,6 @@ vec3 normalCylinder(vec3 hitPos) {
     }
 }
 
-
 // ----------------------------------------------
 // intersectCone: ray-cone intersection in object space
 float intersectCone(vec3 ro, vec3 rd) {
@@ -422,7 +421,7 @@ vec3 getWorldRayDir() {
     uv = 2. * uv - 1.;
     vec3 uvworld = (uCamWorldMatrix * vec4(uv, -1.0, 1.0)).xyz;
     
-    vec3 dir = uvworld - uCameraPos; 
+    vec3 dir = uvworld - uCameraPos;
     return normalize(dir);
 }
 
@@ -447,25 +446,21 @@ float intersect(vec3 ro, vec3 rd, int idx) {
             if (t != -1.0) return t;
             break;
         }
-
         case SHAPE_SPHERE: {
             float t = intersectSphere(ro, rd);
             if (t != -1.0) return t;
             break;
         }
-
         case SHAPE_CYLINDER: {
             float t = intersectCylinder(ro, rd);
             if (t != -1.0) return t;
             break;
         }
-
         case SHAPE_CONE: {
             float t = intersectCone(ro, rd);
             if (t != -1.0) return t;
             break;
         }
-
         default:
             break;
     }
@@ -473,6 +468,7 @@ float intersect(vec3 ro, vec3 rd, int idx) {
     return INF;
 }
 
+// funnel for intersecting different object types
 vec3 getNormal(vec3 hitPos, int idx) {
     int type = int(fetchFloat(0, idx));
 
@@ -480,19 +476,15 @@ vec3 getNormal(vec3 hitPos, int idx) {
         case SHAPE_CUBE: {
             return normalCube(hitPos);
         }
-
         case SHAPE_SPHERE: {
             return normalSphere(hitPos);
         }
-
         case SHAPE_CYLINDER: {
             return normalCylinder(hitPos);
         }
-
         case SHAPE_CONE: {
             return normalCone(hitPos);
         }
-
         default:
             break;
     }
@@ -504,39 +496,37 @@ vec3 getNormal(vec3 hitPos, int idx) {
 // end goal: trace a ray that bounces 5 times to determine color of pixel
 vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
     // TODO: implement ray tracing logic
-    // Get the object space rayOrigin and rayDir
-    float t = -1.0;
-    vec3 normal = vec3(0.0);
 
-    // NEED TO SAVE INDEX AND META DATA TO USE POST LOOP
-
+    // data to track closest object
+    float t = INF;
+    int objectID = -1;
+    vec3 hitPos = vec3(0.0);
+    vec3 color = vec3(0.0);
+    
     for(int i = 0; i < uObjectCount; i++) {
         // get world to object matrix
         mat4 M = fetchWorldMatrix(i);
-        mat4 worldToCamM = M; //inverse(M);
+        mat4 worldToCamM = inverse(M);
 
         // transform ray
         vec3 ro = (worldToCamM * vec4(rayOrigin, 1.0)).xyz;
-        vec3 rd = (worldToCamM * vec4(rayDir, 1.0)).xyz;
+        vec3 rd = (worldToCamM * vec4(rayDir, 0.0)).xyz;
 
         // use intersect to get t
-        t = intersect(ro, rd, i);
+        float tempT = intersect(ro, rd, i); 
 
-        // just for testing, get normal
-        
+        // determine the object with the lowest positive t value
+        if (tempT != -1.0 && tempT < t) { // this requires t to be positive.
+            t = tempT;
+            objectID = i;
+            hitPos = rayOrigin + rayDir * t; 
+        }
     }
-
-    // Determine which object has the lowest positive t value
-
-    // use t to get hitPos
-    vec3 hitPos = t * rayDir + rayOrigin;
     // use hitPos to get normal
-    // vec3 normal = getNormal(hitPos, i);
-    normal = getNormal(hitPos, 0);
-
-    // use normal to get color
-    // return color
-    return normal;
+    vec3 normal = getNormal(hitPos, objectID);
+    // TODO: use normal to get color
+    if (t != INF) color = vec3(1.0); // for isect only
+    return color;
 }
 
 

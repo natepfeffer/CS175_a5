@@ -338,7 +338,7 @@ export class WebGLRenderer {
 
         // Global coefficients
         const globalData = this.sceneParser.getGlobalData();
-        console.log("globalssssssss:", globalData);
+        // console.log("globalssssssss:", globalData);
         this.programs.rayTrace.setFloat('uGlobalKa', globalData.ka);
         this.programs.rayTrace.setFloat('uGlobalKd', globalData.kd);
         this.programs.rayTrace.setFloat('uGlobalKs', globalData.ks);
