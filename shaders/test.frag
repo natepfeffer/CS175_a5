@@ -528,6 +528,9 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         return vec3(0.0);
     }
 
+    // If intersection and not final recursion level, begin recursion
+    
+
     // if ((t != INF) && (t > .0)) return vec3(1.0);
 
     // Get the world matrix for this object
