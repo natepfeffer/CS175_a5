@@ -193,7 +193,7 @@ vec3 normalSphere(vec3 hitPos) {
 // intersectCube: ray-cube intersection in object space
 // Cube is centered at origin with side length = 1
 float intersectCube(vec3 ro, vec3 rd) {
-    // TODO: implement ray-cube intersection
+    // DONE: implement ray-cube intersection
     // return -1.0;
 
     float txp = (HALF - ro.x) / rd.x;
@@ -228,7 +228,7 @@ float intersectCube(vec3 ro, vec3 rd) {
 // ----------------------------------------------
 // normalCube: compute normal at intersection point in object space
 vec3 normalCube(vec3 hitPos) {
-    // TODO: implement normal computation for cube
+    // DONE: implement normal computation for cube
     vec3 n = vec3(0.0);
 
     if (abs(hitPos.x - HALF) < EPSILON)  n.x =  1.0;
@@ -392,46 +392,6 @@ vec3 normalCone(vec3 hitPos) {
 }
 
 
-vec2 getTexCoordSphere(vec3 hit, vec2 repeatUV) {
-    // TODO: implement spherical mapping
-    return vec2(0.0);
-}
-
-vec2 getTexCoordCube(vec3 hit, vec3 dominantFace, vec2 repeatUV) {
-    // TODO: implement cubic mapping
-    return vec2(0.0);
-}
-
-vec2 getTexCoordCylinder(vec3 hit, vec2 repeatUV) {
-    // TODO: implement cylindrical mapping
-    return vec2(0.0);
-}
-
-vec2 getTexCoordCone(vec3 hit, vec2 repeatUV) {
-    // TODO: implement conical mapping
-    return vec2(0.0);
-}
-
-
-// ----------------------------------------------
-// getWorldRayDir: reconstruct world-space ray direction using uCamWorldMatrix
-vec3 getWorldRayDir() {
-    vec2 uv  = gl_FragCoord.xy / uResolution; 
-    // TODO: compute ray direction in world space
-    uv = 2. * uv - 1.;
-    vec3 uvworld = (uCamWorldMatrix * vec4(uv, -1.0, 1.0)).xyz;
-    
-    vec3 dir = uvworld - uCameraPos;
-    return normalize(dir);
-}
-
-// to help test occlusion (shadow)
-bool isInShadow(vec3 p, vec3 lightDir, float maxDist) {
-    // TODO: implement shadow ray intersection test
-    return false; 
-}
-
-
 //----------------------------------------------
 // CUSTOM HELPER Functions
 //----------------------------------------------
@@ -490,6 +450,68 @@ vec3 getNormal(vec3 hitPos, int idx) {
     }
 
     return vec3(0.0); 
+}
+// ----------------------------------------------
+// END of CUSTOM HELPER Functions
+// ----------------------------------------------
+
+
+vec2 getTexCoordSphere(vec3 hit, vec2 repeatUV) {
+    // TODO: implement spherical mapping
+    return vec2(0.0);
+}
+
+vec2 getTexCoordCube(vec3 hit, vec3 dominantFace, vec2 repeatUV) {
+    // TODO: implement cubic mapping
+    return vec2(0.0);
+}
+
+vec2 getTexCoordCylinder(vec3 hit, vec2 repeatUV) {
+    // TODO: implement cylindrical mapping
+    return vec2(0.0);
+}
+
+vec2 getTexCoordCone(vec3 hit, vec2 repeatUV) {
+    // TODO: implement conical mapping
+    return vec2(0.0);
+}
+
+
+// ----------------------------------------------
+// getWorldRayDir: reconstruct world-space ray direction using uCamWorldMatrix
+vec3 getWorldRayDir() {
+    vec2 uv  = gl_FragCoord.xy / uResolution; 
+    // TODO: compute ray direction in world space
+    uv = 2. * uv - 1.;
+    vec3 uvworld = (uCamWorldMatrix * vec4(uv, -1.0, 1.0)).xyz;
+    
+    vec3 dir = uvworld - uCameraPos;
+    return normalize(dir);
+}
+
+// to help test occlusion (shadow)
+bool isInShadow(vec3 p, vec3 lightDir, float maxDist) {
+    // TODO: implement shadow ray intersection test
+    // loop over each object to check if isect exists within maxDist
+    float t = INF;
+    for(int i = 0; i < uObjectCount; i++) {
+        // get world to object matrix
+        mat4 M = fetchWorldMatrix(i);
+        mat4 worldToObjM = inverse(M);
+
+        // transform ray
+        vec3 ro = (worldToObjM * vec4(p, 1.0)).xyz;
+        vec3 rd = (worldToObjM * vec4(lightDir, 0.0)).xyz; // is it -lightDir?
+
+        // use intersect to get t
+        float tempT = intersect(ro, rd, i); 
+
+        // determine the object with the lowest positive t value
+        if (tempT != -1.0 && tempT < maxDist) { // this requires t to be positive.
+            return true;
+        }
+    }
+    return false; 
 }
 
 // bounce = recursion level (0 for primary rays)
@@ -566,26 +588,35 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         // Get light color and position
         vec3 lightColor = uLightColor[i];
         vec3 lightPos = uLightPos[i];
-        
-        // Calculate light direction (from hit point to light)
-        vec3 lightDir = normalize(lightPos - pWorld);
-        
-        // Calculate reflection vector: R = 2(L·N)N - L
-        float nDotL = dot(nWorld, lightDir);
-        vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
+        vec3 lightDir;
 
-        // Calculate diffuse contribution
-        vec3 diffuse = kd * mat.diffuseColor * max(0.0, nDotL);
-        
-        // Calculate specular contribution (safely)
-        float specFactor = max(0.0, dot(reflectDir, viewDir));
-        specFactor = pow(specFactor, max(EPSILON, mat.shininess)); // Ensure shininess >= 1
-        vec3 specular = ks * mat.specularColor * specFactor;
-        
-        color += lightColor * (diffuse + specular);
+        // Determine light direction based on light type
+        if (uLightType[i] == 0) { // Point light
+            lightDir = normalize(lightPos - pWorld);
+        } else if (uLightType[i] == 1) { // Directional light
+            lightDir = normalize(-uLightDir[i]);
+        } else {
+            continue; // Unsupported light type
+        }
+
+        // Check if this light is obstructed
+        if (!isInShadow(pWorld + nWorld * 2. * EPSILON, lightDir, length(lightPos - pWorld))) {
+            
+            // Calculate reflection vector: R = 2(L·N)N - L
+            float nDotL = dot(nWorld, lightDir);
+            vec3 reflectDir = 2.0 * nDotL * nWorld - lightDir;
+
+            // Calculate diffuse contribution
+            vec3 diffuse = kd * mat.diffuseColor * max(0.0, nDotL);
+            
+            // Calculate specular contribution (safely)
+            float specFactor = max(0.0, dot(reflectDir, viewDir));
+            specFactor = pow(specFactor, max(EPSILON, mat.shininess)); // Ensure shininess >= 1
+            vec3 specular = ks * mat.specularColor * specFactor;
+            
+            color += lightColor * (diffuse + specular);
+        }
     }
-
-
 
     // If intersection and not final recursion level, begin recursion
     vec3 currentRayOrigin = pWorld;
@@ -646,18 +677,29 @@ vec3 traceRay(vec3 rayOrigin, vec3 rayDir) {
         for (int i = 0; i < m; i++) {
             vec3 lightColor = uLightColor[i];
             vec3 lightPos = uLightPos[i];
+            vec3 lightDir;
+
+            // Determine light direction based on light type
+            if (uLightType[i] == 0) { // Point light
+                lightDir = normalize(lightPos - pWorld);
+            } else if (uLightType[i] == 1) { // Directional light
+                lightDir = normalize(-uLightDir[i]);
+            } else {
+                continue; // Unsupported light type
+            }
             
-            vec3 lightDir = normalize(lightPos - pWorldReflect);
-            float nDotL = dot(nWorldReflect, lightDir);
-            vec3 reflectLightDir = 2.0 * nDotL * nWorldReflect - lightDir;
-            
-            vec3 diffuse = kd * matReflect.diffuseColor * max(0.0, nDotL);
-            
-            float specFactor = max(0.0, dot(reflectLightDir, viewDirReflect));
-            specFactor = pow(specFactor, max(EPSILON, matReflect.shininess));
-            vec3 specular = ks * matReflect.specularColor * specFactor;
-            
-            colorReflect += lightColor * (diffuse + specular);
+            if (!isInShadow(pWorldReflect + nWorldReflect * 2. * EPSILON, lightDir, length(lightPos - pWorldReflect))) {
+                float nDotL = dot(nWorldReflect, lightDir);
+                vec3 reflectLightDir = 2.0 * nDotL * nWorldReflect - lightDir;
+                
+                vec3 diffuse = kd * matReflect.diffuseColor * max(0.0, nDotL);
+                
+                float specFactor = max(0.0, dot(reflectLightDir, viewDirReflect));
+                specFactor = pow(specFactor, max(EPSILON, matReflect.shininess));
+                vec3 specular = ks * matReflect.specularColor * specFactor;
+                
+                colorReflect += lightColor * (diffuse + specular);
+            }
         }
         
         // Add contribution with depth attenuation

@@ -306,7 +306,7 @@ export class WebGLRenderer {
     }
 
     renderFrame() {
-        console.log("rendering frame");
+        //console.log("rendering frame");
 
         const gl = this.gl;
         this.resizeCanvasToDisplaySize();
